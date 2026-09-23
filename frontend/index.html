@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Security Scanner</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+</head>
+<body>
+
+    <header>
+        <h1>QR Code Security</h1>
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#scanner">Scanner</a>
+            <a href="#history">History</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- HOME SECTION -->
+        <section id="home" class="card">
+            <h2>QR CODE SECURITY</h2>
+            <p>Protect yourself from suspicious QR-code links.</p>
+            <a href="#scanner" class="btn">Scan QR Code</a>
+        </section>
+
+        <!-- SCANNER SECTION -->
+        <section id="scanner" class="card">
+            <h2>SCANNER</h2>
+            <p>Upload QR Code</p>
+            <div class="upload-group">
+                <input type="file" id="qrImage" accept="image/*">
+                <button onclick="analyzeQR()" class="btn btn-primary">Analyze</button>
+            </div>
+        </section>
+
+        <!-- RESULT SECTION -->
+        <section id="result-section" class="card hidden">
+            <h2>QR SECURITY ANALYSIS</h2>
+            <div id="resultContent"></div>
+        </section>
+
+        <!-- HISTORY SECTION -->
+        <section id="history" class="card">
+            <h2>HISTORY</h2>
+            <p>Previous scans.</p>
+            <button onclick="fetchHistory()" class="btn btn-secondary">Refresh History</button>
+            <div id="historyList" class="history-list"></div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
