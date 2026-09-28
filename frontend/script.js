@@ -1,17 +1,17 @@
 const codeReader = new ZXing.BrowserQRCodeReader();
 
 async function analyzeQR() {
-    const fileInput = document.getElementById('qrImage');
+    const fileInput = document.getElementById('qrImage') || document.getElementById('qr-file');
     const resultSection = document.getElementById('result-section');
     const resultContent = document.getElementById('resultContent');
 
-    if (!fileInput.files || fileInput.files.length === 0) {
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         alert('Please select a QR code image first.');
         return;
     }
 
-    resultSection.classList.remove('hidden');
-    resultContent.innerHTML = '<p>Analyzing QR code...</p>';
+    if (resultSection) resultSection.classList.remove('hidden');
+    if (resultContent) resultContent.innerHTML = '<p>Analyzing QR code...</p>';
 
     const file = fileInput.files[0];
     const reader = new FileReader();
@@ -24,11 +24,17 @@ async function analyzeQR() {
                 const result = await codeReader.decodeFromImageElement(img);
                 const scannedUrl = result.getText();
 
-                // Send decoded text to Spring Boot Backend
+                // Check localStorage key matching auth section ('currentUser' or fallback 'username')
+                const currentUser = localStorage.getItem('currentUser') || localStorage.getItem('username') || 'smit123';
+
+                // Send decoded text & logged-in username to Spring Boot Backend
                 const response = await fetch('http://localhost:8080/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: scannedUrl })
+                    body: JSON.stringify({ 
+                        url: scannedUrl,
+                        scannedBy: currentUser
+                    })
                 });
 
                 const data = await response.json();
@@ -44,20 +50,32 @@ async function analyzeQR() {
                         data.reasons.map(r => `<li>ℹ️ ${r}</li>`).join('') + `</ul>`;
                 }
 
-                resultContent.innerHTML = `
-                    <div class="result-box">
-                        <p class="result-item"><strong>Content:</strong> ${scannedUrl}</p>
-                        <p class="result-item"><strong>Risk Score:</strong> ${data.score}/100</p>
-                        <p class="result-item"><strong>STATUS:</strong> <span class="badge ${badgeClass}">${data.status.toUpperCase()}</span></p>
-                        ${warningsHtml}
-                    </div>
-                `;
+                if (resultContent) {
+                    resultContent.innerHTML = `
+                        <div class="result-box">
+                            <p class="result-item"><strong>Content:</strong> ${scannedUrl}</p>
+                            <p class="result-item"><strong>Risk Score:</strong> ${data.score !== undefined ? data.score : (data.riskScore || 0)}/100</p>
+                            <p class="result-item"><strong>STATUS:</strong> <span class="badge ${badgeClass}">${(data.status || 'SAFE').toUpperCase()}</span></p>
+                            ${warningsHtml}
+                        </div>
+                    `;
+                }
 
-                fetchHistory();
+                // Reset file selection
+                fileInput.value = '';
+
+                // Refresh history using available handler
+                if (typeof loadLogs === 'function') {
+                    await loadLogs();
+                } else if (typeof fetchHistory === 'function') {
+                    await fetchHistory();
+                }
 
             } catch (err) {
                 console.error(err);
-                resultContent.innerHTML = '<p style="color: red;">Could not decode QR code. Please ensure the QR image is clear, not heavily distorted, and cropped close to the code.</p>';
+                if (resultContent) {
+                    resultContent.innerHTML = '<p style="color: red;">Could not decode QR code. Please ensure the QR image is clear, not heavily distorted, and cropped close to the code.</p>';
+                }
             }
         };
         img.src = e.target.result;
@@ -72,6 +90,8 @@ async function fetchHistory() {
 
     try {
         const response = await fetch('http://localhost:8080/api/history');
+        if (!response.ok) return;
+
         const data = await response.json();
 
         if (data.length === 0) {
@@ -81,10 +101,12 @@ async function fetchHistory() {
 
         let html = '';
         data.forEach(item => {
+            const score = item.score !== undefined ? item.score : (item.riskScore || 0);
             html += `
                 <div class="history-item">
+                    <p><strong>Scanned By:</strong> ${item.scannedBy || 'Anonymous'}</p>
                     <p><strong>URL:</strong> ${item.url}</p>
-                    <p><strong>Score:</strong> ${item.riskScore} | <strong>Status:</strong> ${item.riskLevel}</p>
+                    <p><strong>Score:</strong> ${score}% | <strong>Status:</strong> ${item.riskLevel || item.status || 'Safe'}</p>
                 </div>
             `;
         });
@@ -96,4 +118,10 @@ async function fetchHistory() {
     }
 }
 
-window.onload = fetchHistory;
+window.onload = () => {
+    if (typeof loadLogs === 'function') {
+        loadLogs();
+    } else {
+        fetchHistory();
+    }
+};
